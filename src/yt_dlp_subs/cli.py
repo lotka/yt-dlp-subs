@@ -74,12 +74,33 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _config_path() -> Path:
+    return Path.home() / ".config" / "yt-dlp-subs" / "config"
+
+
+def _read_config_key() -> str | None:
+    path = _config_path()
+    if not path.exists():
+        return None
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if line.startswith("GROQ_API_KEY="):
+            return line[len("GROQ_API_KEY="):]
+    return None
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
 
     if not args.groq_api_key:
-        parser.error("missing --groq-api-key or GROQ_API_KEY")
+        args.groq_api_key = _read_config_key()
+
+    if not args.groq_api_key:
+        parser.error(
+            f"missing --groq-api-key or GROQ_API_KEY env var. "
+            f"You can also save it to {_config_path()} as GROQ_API_KEY=gsk_..."
+        )
 
     try:
         _status(f"Downloading audio from {args.url}...", quiet=args.quiet)

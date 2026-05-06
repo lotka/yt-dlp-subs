@@ -113,6 +113,12 @@ export GROQ_API_KEY="gsk_..."
 yt-dlp-subs "https://www.youtube.com/watch?v=d0b6ECKU_Os"
 ```
 
+Check the installed version:
+
+```bash
+yt-dlp-subs --version
+```
+
 Useful options:
 
 ```bash
@@ -121,8 +127,9 @@ yt-dlp-subs URL \
   --model whisper-large-v3 \
   --language en \
   --prompt "Technical talk with Python package names" \
+  --temperature 0.2 \
   --keep-audio \
   --keep-video
 ```
 
-The default model is `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy is more important than speed.
+The default model is `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy is more important than speed. The default temperature is `0.0` (fully deterministic); increase it slightly (e.g. `0.2`) if the transcription feels too repetitive.

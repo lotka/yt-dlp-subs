@@ -7,6 +7,7 @@ from pathlib import Path
 
 from groq import GroqError
 
+from yt_dlp_subs import __version__
 from yt_dlp_subs.downloader import DownloadFailure, download_audio, output_stem_from_title
 from yt_dlp_subs.srt import to_srt
 from yt_dlp_subs.transcription import transcribe_audio
@@ -17,6 +18,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="yt-dlp-subs",
         description="Download online video audio and generate an SRT subtitle file with Groq.",
     )
+    parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("url", help="Video URL supported by yt-dlp.")
     parser.add_argument(
         "--groq-api-key",
@@ -61,7 +63,13 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--quiet",
         action="store_true",
-        help="Reduce yt-dlp output.",
+        help="Suppress all progress output (yt-dlp and tool status messages).",
+    )
+    parser.add_argument(
+        "--temperature",
+        type=float,
+        default=0.0,
+        help="Sampling temperature for transcription (0.0–1.0, default: 0.0).",
     )
     return parser
 
@@ -74,6 +82,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("missing --groq-api-key or GROQ_API_KEY")
 
     try:
+        _status(f"Downloading audio from {args.url}...", quiet=args.quiet)
         with download_audio(
             args.url,
             audio_format=args.audio_format,
@@ -88,6 +97,7 @@ def main(argv: list[str] | None = None) -> int:
                 model=args.model,
                 language=args.language,
                 prompt=args.prompt,
+                temperature=args.temperature,
             )
 
             if not segments:
@@ -101,10 +111,13 @@ def main(argv: list[str] | None = None) -> int:
                 audio_copy.write_bytes(downloaded.audio_path.read_bytes())
                 _status(f"Saved audio: {audio_copy}", quiet=args.quiet)
 
-            if args.keep_video and downloaded.video_path is not None:
-                video_copy = output_path.with_suffix(downloaded.video_path.suffix)
-                video_copy.write_bytes(downloaded.video_path.read_bytes())
-                _status(f"Saved video: {video_copy}", quiet=args.quiet)
+            if args.keep_video:
+                if downloaded.video_path is not None:
+                    video_copy = output_path.with_suffix(downloaded.video_path.suffix)
+                    video_copy.write_bytes(downloaded.video_path.read_bytes())
+                    _status(f"Saved video: {video_copy}", quiet=args.quiet)
+                else:
+                    print("yt-dlp-subs: warning: --keep-video was set but no video file was found.", file=sys.stderr)
 
             print(f"Saved subtitles: {output_path}")
             return 0

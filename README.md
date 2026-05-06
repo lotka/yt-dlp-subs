@@ -4,13 +4,40 @@ Command line subtitle generation for online videos. It uses `yt-dlp` to extract 
 
 ## Install
 
+### 1. Install system dependencies (macOS)
+
+If you don't have Homebrew:
+
 ```bash
-pyenv local 3.11.11
-pyenv exec python3.11 -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-You also need `ffmpeg` available on your `PATH`, because `yt-dlp` uses it to extract audio.
+Install pyenv and ffmpeg:
+
+```bash
+brew install pyenv ffmpeg
+```
+
+Add pyenv to your shell (create `~/.zshrc` if it doesn't exist):
+
+```bash
+echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
+echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
+echo 'eval "$(pyenv init -)"' >> ~/.zshrc
+source ~/.zshrc
+```
+
+### 2. Install Python and set up the project
+
+```bash
+pyenv install 3.11.11
+pyenv local 3.11.11
+pyenv exec python3.11 -m venv .venv
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+> You need to run `source .venv/bin/activate` every time you open a new terminal in this project.
 
 ## Usage
 

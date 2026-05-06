@@ -33,7 +33,8 @@ yt-dlp-subs URL \
   --model whisper-large-v3 \
   --language en \
   --prompt "Technical talk with Python package names" \
-  --keep-audio
+  --keep-audio \
+  --keep-video
 ```
 
 The default model is `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy is more important than speed.

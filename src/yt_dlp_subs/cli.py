@@ -54,6 +54,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="Copy the extracted audio next to the subtitle file.",
     )
     parser.add_argument(
+        "--keep-video",
+        action="store_true",
+        help="Keep the downloaded video file next to the subtitle file.",
+    )
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Reduce yt-dlp output.",
@@ -69,7 +74,12 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("missing --groq-api-key or GROQ_API_KEY")
 
     try:
-        with download_audio(args.url, audio_format=args.audio_format, quiet=args.quiet) as downloaded:
+        with download_audio(
+            args.url,
+            audio_format=args.audio_format,
+            quiet=args.quiet,
+            keep_video=args.keep_video,
+        ) as downloaded:
             output_path = _resolve_output_path(args.output, downloaded.title)
             _status(f"Transcribing audio with {args.model}...", quiet=args.quiet)
             segments = transcribe_audio(
@@ -90,6 +100,11 @@ def main(argv: list[str] | None = None) -> int:
                 audio_copy = output_path.with_suffix(downloaded.audio_path.suffix)
                 audio_copy.write_bytes(downloaded.audio_path.read_bytes())
                 _status(f"Saved audio: {audio_copy}", quiet=args.quiet)
+
+            if args.keep_video and downloaded.video_path is not None:
+                video_copy = output_path.with_suffix(downloaded.video_path.suffix)
+                video_copy.write_bytes(downloaded.video_path.read_bytes())
+                _status(f"Saved video: {video_copy}", quiet=args.quiet)
 
             print(f"Saved subtitles: {output_path}")
             return 0

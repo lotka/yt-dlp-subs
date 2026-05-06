@@ -13,10 +13,17 @@ class DownloadFailure(RuntimeError):
 
 
 class DownloadedAudio:
-    def __init__(self, temp_dir: TemporaryDirectory[str], audio_path: Path, title: str) -> None:
+    def __init__(
+        self,
+        temp_dir: TemporaryDirectory[str],
+        audio_path: Path,
+        title: str,
+        video_path: Path | None = None,
+    ) -> None:
         self._temp_dir = temp_dir
         self.audio_path = audio_path
         self.title = title
+        self.video_path = video_path
 
     def cleanup(self) -> None:
         self._temp_dir.cleanup()
@@ -28,13 +35,19 @@ class DownloadedAudio:
         self.cleanup()
 
 
-def download_audio(url: str, *, audio_format: str = "mp3", quiet: bool = False) -> DownloadedAudio:
+def download_audio(
+    url: str,
+    *,
+    audio_format: str = "mp3",
+    quiet: bool = False,
+    keep_video: bool = False,
+) -> DownloadedAudio:
     temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-")
     temp_path = Path(temp_dir.name)
-    outtmpl = str(temp_path / "audio.%(ext)s")
+    outtmpl = str(temp_path / ("video.%(ext)s" if keep_video else "audio.%(ext)s"))
 
     options = {
-        "format": "bestaudio/best",
+        "format": "bestvideo+bestaudio/best" if keep_video else "bestaudio/best",
         "outtmpl": outtmpl,
         "quiet": quiet,
         "no_warnings": quiet,
@@ -46,6 +59,9 @@ def download_audio(url: str, *, audio_format: str = "mp3", quiet: bool = False) 
             }
         ],
     }
+
+    if keep_video:
+        options["keepvideo"] = True
 
     try:
         with YoutubeDL(options) as ydl:
@@ -60,7 +76,12 @@ def download_audio(url: str, *, audio_format: str = "mp3", quiet: bool = False) 
         temp_dir.cleanup()
         raise DownloadFailure("yt-dlp completed but no audio file was produced")
 
-    return DownloadedAudio(temp_dir, audio_path, title)
+    video_path = _find_video_file(temp_path, audio_path) if keep_video else None
+    if keep_video and video_path is None:
+        temp_dir.cleanup()
+        raise DownloadFailure("yt-dlp completed but no video file was produced")
+
+    return DownloadedAudio(temp_dir, audio_path, title, video_path=video_path)
 
 
 def output_stem_from_title(title: str) -> str:
@@ -76,6 +97,17 @@ def _find_audio_file(directory: Path, audio_format: str) -> Path | None:
     if len(candidates) == 1:
         return candidates[0]
     return next((path for path in candidates if path.suffix.lstrip(".") == audio_format), None)
+
+
+def _find_video_file(directory: Path, audio_path: Path) -> Path | None:
+    candidates = [
+        path
+        for path in _files(directory)
+        if path != audio_path and not path.name.endswith(".part")
+    ]
+    if len(candidates) == 1:
+        return candidates[0]
+    return next((path for path in candidates if path.suffix != audio_path.suffix), None)
 
 
 def _files(directory: Path) -> Iterator[Path]:

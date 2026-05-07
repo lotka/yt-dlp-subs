@@ -4,101 +4,74 @@ Command line subtitle generation for online videos. It uses `yt-dlp` to extract 
 
 ## Install
 
-### macOS
+Requires Python 3.10 or newer and `ffmpeg` on your `PATH`. `yt-dlp` uses
+`ffmpeg` to extract audio before the file is sent to Groq for transcription.
 
-If you don't have Homebrew:
+On macOS:
 
 ```bash
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+brew install ffmpeg
 ```
 
-Install pyenv and ffmpeg:
+On Linux:
 
 ```bash
-brew install pyenv ffmpeg
-```
-
-Add pyenv to your shell (create `~/.zshrc` if it doesn't exist):
-
-```bash
-echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.zshrc
-echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.zshrc
-echo 'eval "$(pyenv init -)"' >> ~/.zshrc
-source ~/.zshrc
-```
-
-Install Python and set up the project:
-
-```bash
-pyenv install 3.11.11
-pyenv local 3.11.11
-pyenv exec python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
-
----
-
-### Linux (Ubuntu / Debian)
-
-Install build dependencies and ffmpeg:
-
-```bash
+# Debian/Ubuntu
 sudo apt update
-sudo apt install -y ffmpeg curl git build-essential libssl-dev zlib1g-dev \
-  libbz2-dev libreadline-dev libsqlite3-dev libncursesw5-dev \
-  xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+sudo apt install ffmpeg
+
+# Fedora
+sudo dnf install ffmpeg
+
+# Arch Linux
+sudo pacman -S ffmpeg
 ```
 
-Install pyenv:
+On Windows, install `ffmpeg` with one of these package managers, then open a
+new PowerShell window:
 
-```bash
-curl https://pyenv.run | bash
+```powershell
+# winget
+winget install Gyan.FFmpeg
+
+# Chocolatey
+choco install ffmpeg
+
+# Scoop
+scoop install ffmpeg
 ```
 
-Add pyenv to your shell (`~/.bashrc` or `~/.zshrc`):
+Install the CLI from this checkout.
+
+On macOS/Linux:
 
 ```bash
-echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-echo 'export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-echo 'eval "$(pyenv init -)"' >> ~/.bashrc
-source ~/.bashrc
+bash install.sh
 ```
 
-Install Python and set up the project:
+On Windows (PowerShell):
+
+```powershell
+.\install.ps1
+```
+
+If the `yt-dlp-subs` command is not found after install, open a new terminal.
+
+For local development, install it in editable mode with the test dependencies:
 
 ```bash
-pyenv install 3.11.11
-pyenv local 3.11.11
-pyenv exec python3.11 -m venv .venv
+python3 -m venv .venv
 source .venv/bin/activate
-pip install -e ".[dev]"
+python -m pip install -e ".[dev]"
 ```
 
----
-
-### Windows
-
-1. Install [ffmpeg](https://ffmpeg.org/download.html) and add it to your `PATH`.
-2. Install [pyenv-win](https://github.com/pyenv-win/pyenv-win) via PowerShell (run as Administrator):
+On Windows:
 
 ```powershell
-Invoke-WebRequest -UseBasicParsing -Uri "https://raw.githubusercontent.com/pyenv-win/pyenv-win/master/pyenv-win/install-pyenv-win.ps1" -OutFile "./install-pyenv-win.ps1"; &"./install-pyenv-win.ps1"
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
 ```
-
-Restart your terminal, then:
-
-```powershell
-pyenv install 3.11.11
-pyenv local 3.11.11
-python -m venv .venv
-.venv\Scripts\activate
-pip install -e ".[dev]"
-```
-
----
-
-> Run `source .venv/bin/activate` (macOS/Linux) or `.venv\Scripts\activate` (Windows) every time you open a new terminal in this project.
 
 ## Usage
 

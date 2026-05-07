@@ -41,21 +41,21 @@ choco install ffmpeg
 scoop install ffmpeg
 ```
 
-Install the CLI from this checkout (run this outside any virtual environment):
+Install the CLI from this checkout.
+
+On macOS/Linux:
 
 ```bash
-python3 -m pip install --user pipx
-python3 -m pipx ensurepath
-pipx install .
+bash install.sh
 ```
 
-On Windows, use `py` instead of `python3`:
+On Windows (PowerShell):
 
 ```powershell
-py -m pip install --user pipx
-py -m pipx ensurepath
-pipx install .
+.\install.ps1
 ```
+
+If the `yt-dlp-subs` command is not found after install, open a new terminal.
 
 For local development, install it in editable mode with the test dependencies:
 

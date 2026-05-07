@@ -114,6 +114,19 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     try:
+        _status(f"Model: {args.model}", quiet=args.quiet)
+        if args.language:
+            _status(f"Language: {args.language}", quiet=args.quiet)
+        if args.prompt:
+            _status(f"Prompt: {args.prompt}", quiet=args.quiet)
+        if args.temperature != 0.0:
+            _status(f"Temperature: {args.temperature}", quiet=args.quiet)
+        if args.audio_format != "mp3":
+            _status(f"Audio format: {args.audio_format}", quiet=args.quiet)
+        if args.keep_audio:
+            _status("Keeping audio file", quiet=args.quiet)
+        if args.keep_video:
+            _status("Keeping video file", quiet=args.quiet)
         _status(f"Downloading audio from {args.url}...", quiet=args.quiet)
         with download_audio(
             args.url,

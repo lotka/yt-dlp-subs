@@ -73,17 +73,60 @@ py -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
+## Testing
+
+First install the dev dependencies (includes `pytest`):
+
+```bash
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+### Unit tests
+
+Run the full test suite (covers CLI flags, SRT formatting, and transcription parsing):
+
+```bash
+pytest tests/
+```
+
+### End-to-end test
+
+Run the tool against a real video to verify the full pipeline (requires a valid `GROQ_API_KEY`):
+
+```bash
+yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+```
+
+This should produce a `Me_at_the_zoo.srt` file in the current directory.
+
+## Contributing
+
+1. Fork the repository and create a branch for your change.
+2. Set up the dev environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -e ".[dev]"
+   ```
+3. Make your changes — the project follows a four-stage pipeline: `cli.py` → `downloader.py` → `transcription.py` → `srt.py`.
+4. Add or update tests in `tests/` and make sure the full suite passes:
+   ```bash
+   pytest tests/
+   ```
+5. Open a pull request with a clear description of what changed and why.
+
 ## Usage
 
 ```bash
-yt-dlp-subs "https://www.youtube.com/watch?v=d0b6ECKU_Os" --groq-api-key="$GROQ_API_KEY"
+yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw" --groq-api-key="$GROQ_API_KEY"
 ```
 
 You can also set the API key once via an environment variable:
 
 ```bash
 export GROQ_API_KEY="gsk_..."
-yt-dlp-subs "https://www.youtube.com/watch?v=d0b6ECKU_Os"
+yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw"
 ```
 
 Or save it permanently to a local config file so you never need to pass it again:

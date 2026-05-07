@@ -167,12 +167,12 @@ yt-dlp-subs SOURCE \
   --prompt "Technical talk with Python package names" \
   --temperature 0.2 \
   --keep-audio \
-  --keep-video \
+  --no-keep-video \
   --open
 ```
 
 Pass `--open` to reveal the output folder in Finder (macOS), Explorer (Windows), or the default file manager (Linux) once the subtitle file is saved.
 
-Pass `--keep-video` to save the full downloaded or local video next to the subtitle file while still extracting audio for transcription.
+By default, the full downloaded or local video is saved next to the subtitle file while audio is extracted for transcription. Pass `--no-keep-video` to skip saving a video copy and process audio only. Pass `--keep-audio` to also save the extracted audio file.
 
 The default model is `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy is more important than speed. The default temperature is `0.0` (fully deterministic); increase it slightly (e.g. `0.2`) if the transcription feels too repetitive.

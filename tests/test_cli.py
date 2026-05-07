@@ -24,7 +24,7 @@ def test_defaults(parse):
     assert args.prompt is None
     assert args.output is None
     assert args.keep_audio is False
-    assert args.keep_video is False
+    assert args.keep_video is True
     assert args.quiet is False
     assert args.open is False
 
@@ -35,6 +35,10 @@ def test_keep_audio(parse):
 
 def test_keep_video(parse):
     assert parse("--keep-video").keep_video is True
+
+
+def test_no_keep_video(parse):
+    assert parse("--no-keep-video").keep_video is False
 
 
 def test_open_flag(parse):
@@ -120,7 +124,7 @@ def test_main_does_not_overwrite_local_video_when_default_output_matches_source(
         lambda *args, **kwargs: [SubtitleSegment(0, 1, "hello")],
     )
 
-    assert main([str(source), "--keep-video", "--groq-api-key", "gsk_test", "--quiet"]) == 0
+    assert main([str(source), "--groq-api-key", "gsk_test", "--quiet"]) == 0
     assert source.read_bytes() == b"original video"
     assert (tmp_path / "sample.srt").exists()
 
@@ -156,3 +160,28 @@ def test_main_copies_local_video_when_output_does_not_match_source(tmp_path, mon
     assert main([str(source), "--keep-video", "--output", str(output), "--groq-api-key", "gsk_test", "--quiet"]) == 0
     assert source.read_bytes() == b"original video"
     assert (tmp_path / "transcript.mkv").read_bytes() == b"temporary video copy"
+
+
+def test_main_passes_no_keep_video_to_downloader(tmp_path, monkeypatch):
+    source = tmp_path / "sample.mkv"
+    source.write_bytes(b"original video")
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-test-")
+    temp_path = Path(temp_dir.name)
+    audio_path = temp_path / "audio.mp3"
+    audio_path.write_bytes(b"audio")
+
+    def fake_download_audio(source_arg, **kwargs):
+        assert source_arg == str(source)
+        assert kwargs["keep_video"] is False
+        return DownloadedAudio(temp_dir, audio_path, "sample", source_path=source)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("yt_dlp_subs.cli.download_audio", fake_download_audio)
+    monkeypatch.setattr(
+        "yt_dlp_subs.cli.transcribe_audio",
+        lambda *args, **kwargs: [SubtitleSegment(0, 1, "hello")],
+    )
+
+    assert main([str(source), "--no-keep-video", "--groq-api-key", "gsk_test", "--quiet"]) == 0
+    assert source.read_bytes() == b"original video"
+    assert (tmp_path / "sample.srt").exists()

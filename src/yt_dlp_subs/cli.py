@@ -64,8 +64,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--keep-video",
-        action="store_true",
-        help="Keep the full downloaded or local video file next to the subtitle file.",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Save the full downloaded or local video next to the subtitle file. Enabled by default; use --no-keep-video for audio-only processing.",
     )
     parser.add_argument(
         "--quiet",
@@ -171,7 +172,7 @@ def main(argv: list[str] | None = None) -> int:
                     else:
                         video_copy.write_bytes(downloaded.video_path.read_bytes())
                         _status(f"Saved video: {video_copy}", quiet=args.quiet)
-                else:
+                elif downloaded.source_path is None:
                     _err.print("[yellow]warning:[/yellow] --keep-video was set but no video file was found.")
 
             _console.print(f"[green]✓[/green] Saved subtitles: {output_path}")

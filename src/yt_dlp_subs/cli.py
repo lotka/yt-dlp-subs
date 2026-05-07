@@ -23,10 +23,10 @@ _err = Console(stderr=True)
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="yt-dlp-subs",
-        description="Download online video audio and generate an SRT subtitle file with Groq.",
+        description="Generate an SRT subtitle file from an online video or local media file with Groq.",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
-    parser.add_argument("url", help="Video URL supported by yt-dlp.")
+    parser.add_argument("source", help="Video URL supported by yt-dlp, or a local audio/video file.")
     parser.add_argument(
         "--groq-api-key",
         default=os.environ.get("GROQ_API_KEY"),
@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--keep-video",
         action="store_true",
-        help="Keep the downloaded video file next to the subtitle file.",
+        help="Keep the full downloaded or local video file next to the subtitle file.",
     )
     parser.add_argument(
         "--quiet",
@@ -128,9 +128,9 @@ def main(argv: list[str] | None = None) -> int:
             _status("Keeping audio file", quiet=args.quiet)
         if args.keep_video:
             _status("Keeping video file", quiet=args.quiet)
-        _status(f"Downloading audio from {args.url}...", quiet=args.quiet)
+        _status(f"Preparing audio from {args.source}...", quiet=args.quiet)
         with download_audio(
-            args.url,
+            args.source,
             audio_format=args.audio_format,
             quiet=args.quiet,
             keep_video=args.keep_video,
@@ -166,8 +166,11 @@ def main(argv: list[str] | None = None) -> int:
             if args.keep_video:
                 if downloaded.video_path is not None:
                     video_copy = output_path.with_suffix(downloaded.video_path.suffix)
-                    video_copy.write_bytes(downloaded.video_path.read_bytes())
-                    _status(f"Saved video: {video_copy}", quiet=args.quiet)
+                    if _same_path(video_copy, downloaded.source_path):
+                        _status(f"Keeping original video: {video_copy}", quiet=args.quiet)
+                    else:
+                        video_copy.write_bytes(downloaded.video_path.read_bytes())
+                        _status(f"Saved video: {video_copy}", quiet=args.quiet)
                 else:
                     _err.print("[yellow]warning:[/yellow] --keep-video was set but no video file was found.")
 
@@ -191,6 +194,15 @@ def _resolve_output_path(output: Path | None, title: str) -> Path:
 
 def _strip_ansi(text: str) -> str:
     return re.sub(r"\x1b\[[0-9;]*m", "", text)
+
+
+def _same_path(left: Path, right: Path | None) -> bool:
+    if right is None:
+        return False
+    try:
+        return left.resolve() == right.resolve()
+    except OSError:
+        return False
 
 
 def _open_in_explorer(path: Path) -> None:

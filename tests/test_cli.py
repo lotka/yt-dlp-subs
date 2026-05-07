@@ -1,18 +1,22 @@
 import pytest
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
-from yt_dlp_subs.cli import build_parser, _resolve_output_path
+from yt_dlp_subs.cli import build_parser, main, _resolve_output_path, _same_path
+from yt_dlp_subs.downloader import DownloadedAudio
+from yt_dlp_subs.srt import SubtitleSegment
 
 
 @pytest.fixture
 def parse():
     def _parse(*extra):
-        return build_parser().parse_args(["https://example.com", *extra])
+        return build_parser().parse_args(["https://example.com/video", *extra])
     return _parse
 
 
 def test_defaults(parse):
     args = parse()
+    assert args.source == "https://example.com/video"
     assert args.model == "whisper-large-v3-turbo"
     assert args.audio_format == "mp3"
     assert args.temperature == 0.0
@@ -75,3 +79,80 @@ def test_resolve_output_path_uses_explicit_output():
 
 def test_resolve_output_path_appends_srt_extension():
     assert _resolve_output_path(Path("custom"), "ignored") == Path("custom.srt")
+
+
+def test_same_path_matches_equivalent_paths(tmp_path):
+    path = tmp_path / "sample.mkv"
+    path.write_bytes(b"video")
+
+    assert _same_path(path, tmp_path / "." / "sample.mkv") is True
+
+
+def test_same_path_handles_missing_right_path(tmp_path):
+    assert _same_path(tmp_path / "sample.mkv", None) is False
+
+
+def test_main_does_not_overwrite_local_video_when_default_output_matches_source(tmp_path, monkeypatch):
+    source = tmp_path / "sample.mkv"
+    source.write_bytes(b"original video")
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-test-")
+    temp_path = Path(temp_dir.name)
+    audio_path = temp_path / "audio.mp3"
+    video_path = temp_path / "sample.mkv"
+    audio_path.write_bytes(b"audio")
+    video_path.write_bytes(b"temporary video copy")
+
+    def fake_download_audio(source_arg, **kwargs):
+        assert source_arg == str(source)
+        assert kwargs["keep_video"] is True
+        return DownloadedAudio(
+            temp_dir,
+            audio_path,
+            "sample",
+            video_path=video_path,
+            source_path=source,
+        )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("yt_dlp_subs.cli.download_audio", fake_download_audio)
+    monkeypatch.setattr(
+        "yt_dlp_subs.cli.transcribe_audio",
+        lambda *args, **kwargs: [SubtitleSegment(0, 1, "hello")],
+    )
+
+    assert main([str(source), "--keep-video", "--groq-api-key", "gsk_test", "--quiet"]) == 0
+    assert source.read_bytes() == b"original video"
+    assert (tmp_path / "sample.srt").exists()
+
+
+def test_main_copies_local_video_when_output_does_not_match_source(tmp_path, monkeypatch):
+    source = tmp_path / "sample.mkv"
+    output = tmp_path / "transcript.srt"
+    source.write_bytes(b"original video")
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-test-")
+    temp_path = Path(temp_dir.name)
+    audio_path = temp_path / "audio.mp3"
+    video_path = temp_path / "sample.mkv"
+    audio_path.write_bytes(b"audio")
+    video_path.write_bytes(b"temporary video copy")
+
+    def fake_download_audio(source_arg, **kwargs):
+        assert source_arg == str(source)
+        assert kwargs["keep_video"] is True
+        return DownloadedAudio(
+            temp_dir,
+            audio_path,
+            "sample",
+            video_path=video_path,
+            source_path=source,
+        )
+
+    monkeypatch.setattr("yt_dlp_subs.cli.download_audio", fake_download_audio)
+    monkeypatch.setattr(
+        "yt_dlp_subs.cli.transcribe_audio",
+        lambda *args, **kwargs: [SubtitleSegment(0, 1, "hello")],
+    )
+
+    assert main([str(source), "--keep-video", "--output", str(output), "--groq-api-key", "gsk_test", "--quiet"]) == 0
+    assert source.read_bytes() == b"original video"
+    assert (tmp_path / "transcript.mkv").read_bytes() == b"temporary video copy"

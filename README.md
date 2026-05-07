@@ -1,6 +1,6 @@
 # yt-dlp-subs
 
-Command line subtitle generation for online videos. It uses `yt-dlp` to extract audio and Groq's Whisper transcription endpoint to produce an `.srt` subtitle file.
+Command line subtitle generation for online videos and local media files. It uses `yt-dlp` or `ffmpeg` to extract audio and Groq's Whisper transcription endpoint to produce an `.srt` subtitle file.
 
 ## Install
 
@@ -100,6 +100,12 @@ yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw"
 
 This should produce a `Me_at_the_zoo.srt` file in the current directory.
 
+You can also run the tool against a local audio or video file:
+
+```bash
+yt-dlp-subs ./video.mp4
+```
+
 ## Contributing
 
 1. Fork the repository and create a branch for your change.
@@ -120,6 +126,13 @@ This should produce a `Me_at_the_zoo.srt` file in the current directory.
 
 ```bash
 yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw" --groq-api-key="$GROQ_API_KEY"
+```
+
+Local audio and video files work the same way:
+
+```bash
+yt-dlp-subs ./video.mp4 --groq-api-key="$GROQ_API_KEY"
+yt-dlp-subs ./audio.wav --output transcript.srt
 ```
 
 You can also set the API key once via an environment variable:
@@ -147,7 +160,7 @@ yt-dlp-subs --version
 Useful options:
 
 ```bash
-yt-dlp-subs URL \
+yt-dlp-subs SOURCE \
   --output subtitles.srt \
   --model whisper-large-v3 \
   --language en \
@@ -159,5 +172,7 @@ yt-dlp-subs URL \
 ```
 
 Pass `--open` to reveal the output folder in Finder (macOS), Explorer (Windows), or the default file manager (Linux) once the subtitle file is saved.
+
+Pass `--keep-video` to save the full downloaded or local video next to the subtitle file while still extracting audio for transcription.
 
 The default model is `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy is more important than speed. The default temperature is `0.0` (fully deterministic); increase it slightly (e.g. `0.2`) if the transcription feels too repetitive.

@@ -41,7 +41,7 @@ choco install ffmpeg
 scoop install ffmpeg
 ```
 
-Install the CLI from this checkout:
+Install the CLI from this checkout (run this outside any virtual environment):
 
 ```bash
 python3 -m pip install --user pipx

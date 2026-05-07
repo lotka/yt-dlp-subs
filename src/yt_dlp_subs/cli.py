@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import os
 import platform
+import re
 import subprocess
 from contextlib import nullcontext
 from pathlib import Path
@@ -178,7 +179,7 @@ def main(argv: list[str] | None = None) -> int:
 
             return 0
     except (DownloadFailure, GroqError, RuntimeError, OSError) as exc:
-        _err.print(f"[red]✗ error:[/red] {exc}")
+        _err.print(f"[red]✗ error:[/red] {_strip_ansi(str(exc))}")
         return 1
 
 
@@ -186,6 +187,10 @@ def _resolve_output_path(output: Path | None, title: str) -> Path:
     if output is not None:
         return output.with_suffix(".srt") if output.suffix == "" else output
     return Path(f"{output_stem_from_title(title)}.srt")
+
+
+def _strip_ansi(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 def _open_in_explorer(path: Path) -> None:

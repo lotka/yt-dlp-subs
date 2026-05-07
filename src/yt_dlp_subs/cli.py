@@ -4,15 +4,19 @@ import argparse
 import os
 import platform
 import subprocess
-import sys
+from contextlib import nullcontext
 from pathlib import Path
 
+from rich.console import Console
 from groq import GroqError
 
 from yt_dlp_subs import __version__
 from yt_dlp_subs.downloader import DownloadFailure, download_audio, output_stem_from_title
 from yt_dlp_subs.srt import to_srt
 from yt_dlp_subs.transcription import transcribe_audio
+
+_console = Console()
+_err = Console(stderr=True)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -118,15 +122,21 @@ def main(argv: list[str] | None = None) -> int:
             keep_video=args.keep_video,
         ) as downloaded:
             output_path = _resolve_output_path(args.output, downloaded.title)
-            _status(f"Transcribing audio with {args.model}...", quiet=args.quiet)
-            segments = transcribe_audio(
-                downloaded.audio_path,
-                api_key=args.groq_api_key,
-                model=args.model,
-                language=args.language,
-                prompt=args.prompt,
-                temperature=args.temperature,
+
+            spinner = (
+                _err.status(f"[cyan]Transcribing audio with {args.model}...[/cyan]")
+                if not args.quiet
+                else nullcontext()
             )
+            with spinner:
+                segments = transcribe_audio(
+                    downloaded.audio_path,
+                    api_key=args.groq_api_key,
+                    model=args.model,
+                    language=args.language,
+                    prompt=args.prompt,
+                    temperature=args.temperature,
+                )
 
             if not segments:
                 raise RuntimeError("Groq returned no transcription text")
@@ -145,9 +155,9 @@ def main(argv: list[str] | None = None) -> int:
                     video_copy.write_bytes(downloaded.video_path.read_bytes())
                     _status(f"Saved video: {video_copy}", quiet=args.quiet)
                 else:
-                    print("yt-dlp-subs: warning: --keep-video was set but no video file was found.", file=sys.stderr)
+                    _err.print("[yellow]warning:[/yellow] --keep-video was set but no video file was found.")
 
-            print(f"Saved subtitles: {output_path}")
+            _console.print(f"[green]✓[/green] Saved subtitles: {output_path}")
 
             if args.open:
                 _status("Opening in explorer...", quiet=args.quiet)
@@ -155,7 +165,7 @@ def main(argv: list[str] | None = None) -> int:
 
             return 0
     except (DownloadFailure, GroqError, RuntimeError, OSError) as exc:
-        print(f"yt-dlp-subs: error: {exc}", file=sys.stderr)
+        _err.print(f"[red]✗ error:[/red] {exc}")
         return 1
 
 
@@ -177,7 +187,7 @@ def _open_in_explorer(path: Path) -> None:
 
 def _status(message: str, *, quiet: bool) -> None:
     if not quiet:
-        print(message, file=sys.stderr)
+        _err.print(f"[cyan]{message}[/cyan]")
 
 
 if __name__ == "__main__":

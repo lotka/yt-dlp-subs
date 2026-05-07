@@ -33,7 +33,7 @@ if (-not (Get-Command pipx -ErrorAction SilentlyContinue)) {
 Write-Host "Installing yt-dlp-subs..."
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pythonPath = (Get-Command py).Source
-pipx install $scriptDir --python $pythonPath
+pipx install $scriptDir --python $pythonPath --force
 
 Write-Host ""
 Write-Host "Done! Run 'yt-dlp-subs --help' to get started."

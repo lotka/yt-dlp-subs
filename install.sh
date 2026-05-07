@@ -33,7 +33,7 @@ fi
 
 # Install the package
 echo "Installing yt-dlp-subs..."
-pipx install "$(dirname "$0")" --python "$(command -v python3)"
+pipx install "$(dirname "$0")" --python "$(command -v python3)" --force
 
 echo ""
 echo "Done! Run 'yt-dlp-subs --help' to get started."

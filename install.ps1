@@ -24,9 +24,17 @@ if (-not (Get-Command ffmpeg -ErrorAction SilentlyContinue)) {
 # Install pipx if missing
 if (-not (Get-Command pipx -ErrorAction SilentlyContinue)) {
     Write-Host "Installing pipx..."
-    py -m pip install --user pipx
-    py -m pipx ensurepath
-    $env:PATH += ";$env:APPDATA\Python\Scripts"
+    if (Get-Command winget -ErrorAction SilentlyContinue) {
+        winget install --id pypa.pipx -e
+    } elseif (Get-Command scoop -ErrorAction SilentlyContinue) {
+        scoop install pipx
+    } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
+        choco install pipx -y
+    } else {
+        py -m pip install --user pipx
+    }
+    pipx ensurepath
+    $env:PATH += ";$env:USERPROFILE\.local\bin"
 }
 
 # Install the package

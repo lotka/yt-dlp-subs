@@ -26,8 +26,18 @@ fi
 # Install pipx if missing
 if ! command -v pipx &>/dev/null; then
     echo "Installing pipx..."
-    python3 -m pip install --user pipx
-    python3 -m pipx ensurepath
+    if command -v pacman &>/dev/null; then
+        sudo pacman -S --noconfirm python-pipx
+    elif command -v apt-get &>/dev/null; then
+        sudo apt-get install -y pipx
+    elif command -v dnf &>/dev/null; then
+        sudo dnf install -y pipx
+    elif command -v brew &>/dev/null; then
+        brew install pipx
+    else
+        python3 -m pip install --user pipx
+    fi
+    pipx ensurepath
     export PATH="$PATH:$HOME/.local/bin"
 fi
 

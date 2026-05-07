@@ -111,7 +111,10 @@ yt-dlp-subs URL \
   --prompt "Technical talk with Python package names" \
   --temperature 0.2 \
   --keep-audio \
-  --keep-video
+  --keep-video \
+  --open
 ```
+
+Pass `--open` to reveal the output folder in Finder (macOS), Explorer (Windows), or the default file manager (Linux) once the subtitle file is saved.
 
 The default model is `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy is more important than speed. The default temperature is `0.0` (fully deterministic); increase it slightly (e.g. `0.2`) if the transcription feels too repetitive.

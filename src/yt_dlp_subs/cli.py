@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import platform
+import subprocess
 import sys
 from pathlib import Path
 
@@ -64,6 +66,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--quiet",
         action="store_true",
         help="Suppress all progress output (yt-dlp and tool status messages).",
+    )
+    parser.add_argument(
+        "--open",
+        action="store_true",
+        help="Open the output folder in the file explorer after saving.",
     )
     parser.add_argument(
         "--temperature",
@@ -141,6 +148,10 @@ def main(argv: list[str] | None = None) -> int:
                     print("yt-dlp-subs: warning: --keep-video was set but no video file was found.", file=sys.stderr)
 
             print(f"Saved subtitles: {output_path}")
+
+            if args.open:
+                _open_in_explorer(output_path.parent)
+
             return 0
     except (DownloadFailure, GroqError, RuntimeError, OSError) as exc:
         print(f"yt-dlp-subs: error: {exc}", file=sys.stderr)
@@ -151,6 +162,16 @@ def _resolve_output_path(output: Path | None, title: str) -> Path:
     if output is not None:
         return output.with_suffix(".srt") if output.suffix == "" else output
     return Path(f"{output_stem_from_title(title)}.srt")
+
+
+def _open_in_explorer(path: Path) -> None:
+    system = platform.system()
+    if system == "Darwin":
+        subprocess.run(["open", path])
+    elif system == "Windows":
+        os.startfile(path)
+    elif system == "Linux":
+        subprocess.run(["xdg-open", path])
 
 
 def _status(message: str, *, quiet: bool) -> None:

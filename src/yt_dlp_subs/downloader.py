@@ -50,7 +50,7 @@ def download_audio(
         "format": "bestvideo+bestaudio/best" if keep_video else "bestaudio/best",
         "outtmpl": outtmpl,
         "quiet": quiet,
-        "no_warnings": quiet,
+        "no_warnings": True,
         "noplaylist": True,
         "postprocessors": [
             {

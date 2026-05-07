@@ -4,7 +4,74 @@ Command line subtitle generation for online videos. It uses `yt-dlp` to extract 
 
 ## Install
 
-TODO
+Requires Python 3.10 or newer and `ffmpeg` on your `PATH`. `yt-dlp` uses
+`ffmpeg` to extract audio before the file is sent to Groq for transcription.
+
+On macOS:
+
+```bash
+brew install ffmpeg
+```
+
+On Linux:
+
+```bash
+# Debian/Ubuntu
+sudo apt update
+sudo apt install ffmpeg
+
+# Fedora
+sudo dnf install ffmpeg
+
+# Arch Linux
+sudo pacman -S ffmpeg
+```
+
+On Windows, install `ffmpeg` with one of these package managers, then open a
+new PowerShell window:
+
+```powershell
+# winget
+winget install Gyan.FFmpeg
+
+# Chocolatey
+choco install ffmpeg
+
+# Scoop
+scoop install ffmpeg
+```
+
+Install the CLI from this checkout:
+
+```bash
+python3 -m pip install --user pipx
+python3 -m pipx ensurepath
+pipx install .
+```
+
+On Windows, use `py` instead of `python3`:
+
+```powershell
+py -m pip install --user pipx
+py -m pipx ensurepath
+pipx install .
+```
+
+For local development, install it in editable mode with the test dependencies:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+```
+
+On Windows:
+
+```powershell
+py -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -e ".[dev]"
+```
 
 ## Usage
 

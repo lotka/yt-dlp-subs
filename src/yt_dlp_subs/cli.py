@@ -150,6 +150,7 @@ def main(argv: list[str] | None = None) -> int:
             print(f"Saved subtitles: {output_path}")
 
             if args.open:
+                _status("Opening in explorer...", quiet=args.quiet)
                 _open_in_explorer(output_path.parent)
 
             return 0

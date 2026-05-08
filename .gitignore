@@ -7,6 +7,5 @@ dist/
 build/
 *.srt
 **/.DS_Store
-tests/subtitles/
 tests/assets/*
 !tests/assets/sample.mkv

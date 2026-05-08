@@ -6,3 +6,6 @@ __pycache__/
 dist/
 build/
 *.srt
+**/.DS_Store
+tests/assets/*
+!tests/assets/sample.mkv

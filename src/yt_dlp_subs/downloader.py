@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import shutil
+import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import Iterator
+from urllib.parse import unquote, urlparse
 
 from yt_dlp import YoutubeDL
 from yt_dlp.utils import DownloadError, sanitize_filename
@@ -19,11 +22,13 @@ class DownloadedAudio:
         audio_path: Path,
         title: str,
         video_path: Path | None = None,
+        source_path: Path | None = None,
     ) -> None:
         self._temp_dir = temp_dir
         self.audio_path = audio_path
         self.title = title
         self.video_path = video_path
+        self.source_path = source_path
 
     def cleanup(self) -> None:
         self._temp_dir.cleanup()
@@ -36,18 +41,48 @@ class DownloadedAudio:
 
 
 def download_audio(
-    url: str,
+    source: str,
     *,
     audio_format: str = "mp3",
     quiet: bool = False,
     keep_video: bool = False,
 ) -> DownloadedAudio:
+    local_path = _local_path_from_source(source)
+    if local_path is not None:
+        return _extract_local_audio(
+            local_path,
+            audio_format=audio_format,
+            quiet=quiet,
+            keep_video=keep_video,
+        )
+    return _download_audio_from_url(
+        source,
+        audio_format=audio_format,
+        quiet=quiet,
+        keep_video=keep_video,
+    )
+
+
+def _download_audio_from_url(
+    url: str,
+    *,
+    audio_format: str,
+    quiet: bool,
+    keep_video: bool,
+) -> DownloadedAudio:
+    if keep_video:
+        return _download_video_from_url(
+            url,
+            audio_format=audio_format,
+            quiet=quiet,
+        )
+
     temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-")
     temp_path = Path(temp_dir.name)
-    outtmpl = str(temp_path / ("video.%(ext)s" if keep_video else "audio.%(ext)s"))
+    outtmpl = str(temp_path / "audio.%(ext)s")
 
     options = {
-        "format": "bestvideo+bestaudio/best" if keep_video else "bestaudio/best",
+        "format": "bestaudio/best",
         "outtmpl": outtmpl,
         "quiet": quiet,
         "no_warnings": True,
@@ -59,9 +94,6 @@ def download_audio(
             }
         ],
     }
-
-    if keep_video:
-        options["keepvideo"] = True
 
     try:
         with YoutubeDL(options) as ydl:
@@ -76,12 +108,107 @@ def download_audio(
         temp_dir.cleanup()
         raise DownloadFailure("yt-dlp completed but no audio file was produced")
 
-    video_path = _find_video_file(temp_path, audio_path) if keep_video else None
-    if keep_video and video_path is None:
+    return DownloadedAudio(temp_dir, audio_path, title)
+
+
+def _download_video_from_url(
+    url: str,
+    *,
+    audio_format: str,
+    quiet: bool,
+) -> DownloadedAudio:
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-")
+    temp_path = Path(temp_dir.name)
+
+    options = {
+        "format": "bestvideo+bestaudio/best",
+        "outtmpl": str(temp_path / "video.%(ext)s"),
+        "quiet": quiet,
+        "no_warnings": True,
+        "noplaylist": True,
+    }
+
+    try:
+        with YoutubeDL(options) as ydl:
+            info = ydl.extract_info(url, download=True)
+    except DownloadError as exc:
+        temp_dir.cleanup()
+        raise DownloadFailure(str(exc)) from exc
+
+    title = _title_from_info(info)
+    video_path = _find_downloaded_video_file(temp_path)
+    if video_path is None:
         temp_dir.cleanup()
         raise DownloadFailure("yt-dlp completed but no video file was produced")
 
+    audio_path = temp_path / f"audio.{audio_format}"
+    try:
+        _extract_audio_to_path(video_path, audio_path, quiet=quiet)
+    except DownloadFailure:
+        temp_dir.cleanup()
+        raise
+
     return DownloadedAudio(temp_dir, audio_path, title, video_path=video_path)
+
+
+def _extract_local_audio(
+    path: Path,
+    *,
+    audio_format: str,
+    quiet: bool,
+    keep_video: bool,
+) -> DownloadedAudio:
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-")
+    temp_path = Path(temp_dir.name)
+    audio_path = temp_path / f"audio.{audio_format}"
+
+    try:
+        _extract_audio_to_path(path, audio_path, quiet=quiet)
+    except DownloadFailure:
+        temp_dir.cleanup()
+        raise
+
+    video_path = None
+    if keep_video and not _looks_like_audio_file(path):
+        video_path = temp_path / path.name
+        shutil.copy2(path, video_path)
+
+    return DownloadedAudio(
+        temp_dir,
+        audio_path,
+        path.stem,
+        video_path=video_path,
+        source_path=path,
+    )
+
+
+def _extract_audio_to_path(source_path: Path, audio_path: Path, *, quiet: bool) -> None:
+    command = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(source_path),
+        "-vn",
+        str(audio_path),
+    ]
+    if quiet:
+        command.insert(1, "-nostats")
+        command.insert(2, "-loglevel")
+        command.insert(3, "error")
+
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError as exc:
+        raise DownloadFailure("ffmpeg was not found on PATH") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.decode(errors="replace").strip()
+        message = f"ffmpeg could not extract audio from {source_path}"
+        if detail:
+            message = f"{message}: {detail}"
+        raise DownloadFailure(message) from exc
+
+    if not audio_path.exists():
+        raise DownloadFailure("ffmpeg completed but no audio file was produced")
 
 
 def output_stem_from_title(title: str) -> str:
@@ -99,21 +226,61 @@ def _find_audio_file(directory: Path, audio_format: str) -> Path | None:
     return next((path for path in candidates if path.suffix.lstrip(".") == audio_format), None)
 
 
-def _find_video_file(directory: Path, audio_path: Path) -> Path | None:
+def _find_downloaded_video_file(directory: Path) -> Path | None:
     candidates = [
         path
         for path in _files(directory)
-        if path != audio_path and not path.name.endswith(".part")
+        if path.suffix and not path.name.endswith(".part")
     ]
     if len(candidates) == 1:
         return candidates[0]
-    return next((path for path in candidates if path.suffix != audio_path.suffix), None)
+
+    exact_stem = [path for path in candidates if path.stem == "video"]
+    if len(exact_stem) == 1:
+        return exact_stem[0]
+
+    video_candidates = [path for path in candidates if not _looks_like_audio_file(path)]
+    if len(video_candidates) == 1:
+        return video_candidates[0]
+    if video_candidates:
+        return max(video_candidates, key=lambda path: path.stat().st_size)
+    return None
 
 
 def _files(directory: Path) -> Iterator[Path]:
     for path in directory.iterdir():
         if path.is_file():
             yield path
+
+
+def _local_path_from_source(source: str) -> Path | None:
+    parsed = urlparse(source)
+    if parsed.scheme == "file":
+        path = Path(unquote(parsed.path)).expanduser()
+    else:
+        path = Path(source).expanduser()
+
+    try:
+        if path.is_file():
+            return path
+    except OSError:
+        return None
+    return None
+
+
+def _looks_like_audio_file(path: Path) -> bool:
+    return path.suffix.lower().lstrip(".") in {
+        "aac",
+        "aiff",
+        "alac",
+        "flac",
+        "m4a",
+        "mp3",
+        "ogg",
+        "opus",
+        "wav",
+        "wma",
+    }
 
 
 def _title_from_info(info: object) -> str:
@@ -125,4 +292,3 @@ def _title_from_info(info: object) -> str:
         if isinstance(webpage_url, str) and webpage_url.strip():
             return webpage_url
     return "subtitles"
-

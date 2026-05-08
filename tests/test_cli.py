@@ -162,6 +162,61 @@ def test_main_copies_local_video_when_output_does_not_match_source(tmp_path, mon
     assert (tmp_path / "transcript.mkv").read_bytes() == b"temporary video copy"
 
 
+def test_main_with_all_options(tmp_path, monkeypatch):
+    source = tmp_path / "sample.mkv"
+    source.write_bytes(b"original video")
+    output = tmp_path / "subtitles.srt"
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-test-")
+    temp_path = Path(temp_dir.name)
+    audio_path = temp_path / "audio.wav"
+    video_path = temp_path / "sample.mkv"
+    audio_path.write_bytes(b"audio")
+    video_path.write_bytes(b"video copy")
+
+    download_kwargs = {}
+    transcribe_kwargs = {}
+    open_calls = []
+
+    def fake_download_audio(source_arg, **kwargs):
+        download_kwargs.update(kwargs)
+        return DownloadedAudio(temp_dir, audio_path, "sample", video_path=video_path, source_path=source)
+
+    def fake_transcribe_audio(audio_path, **kwargs):
+        transcribe_kwargs.update(kwargs)
+        return [SubtitleSegment(0, 1, "hello")]
+
+    monkeypatch.setattr("yt_dlp_subs.cli.download_audio", fake_download_audio)
+    monkeypatch.setattr("yt_dlp_subs.cli.transcribe_audio", fake_transcribe_audio)
+    monkeypatch.setattr("yt_dlp_subs.cli._open_in_explorer", lambda path: open_calls.append(path))
+
+    result = main([
+        str(source),
+        "--groq-api-key", "gsk_test",
+        "--output", str(output),
+        "--model", "whisper-large-v3",
+        "--language", "en",
+        "--prompt", "Me at the zoo",
+        "--temperature", "0.2",
+        "--audio-format", "wav",
+        "--keep-audio",
+        "--keep-video",
+        "--open",
+        "--quiet",
+    ])
+
+    assert result == 0
+    assert download_kwargs["audio_format"] == "wav"
+    assert download_kwargs["keep_video"] is True
+    assert transcribe_kwargs["model"] == "whisper-large-v3"
+    assert transcribe_kwargs["language"] == "en"
+    assert transcribe_kwargs["prompt"] == "Me at the zoo"
+    assert transcribe_kwargs["temperature"] == pytest.approx(0.2)
+    assert output.exists()
+    assert (tmp_path / "subtitles.wav").exists()
+    assert (tmp_path / "subtitles.mkv").exists()
+    assert len(open_calls) == 1
+
+
 def test_main_passes_no_keep_video_to_downloader(tmp_path, monkeypatch):
     source = tmp_path / "sample.mkv"
     source.write_bytes(b"original video")

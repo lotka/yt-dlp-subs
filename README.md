@@ -92,13 +92,39 @@ pytest tests/
 
 ### End-to-end test
 
-Run the tool against a real video to verify the full pipeline (requires a valid `GROQ_API_KEY`):
+Test with a local video file (all options):
 
 ```bash
-yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+yt-dlp-subs sample.mkv \
+  --groq-api-key "$GROQ_API_KEY" \
+  --output subtitles.srt \
+  --model whisper-large-v3 \
+  --language en \
+  --prompt "Me at the zoo" \
+  --temperature 0.2 \
+  --audio-format mp3 \
+  --keep-audio \
+  --keep-video \
+  --open
 ```
 
-This should produce a `Me_at_the_zoo.srt` file in the current directory.
+Test with a YouTube URL (all options):
+
+```bash
+yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw" \
+  --groq-api-key "$GROQ_API_KEY" \
+  --output subtitles.srt \
+  --model whisper-large-v3 \
+  --language en \
+  --prompt "Me at the zoo" \
+  --temperature 0.2 \
+  --audio-format mp3 \
+  --keep-audio \
+  --keep-video \
+  --open
+```
+
+Both should produce a `subtitles.srt` file alongside the audio and video in the current directory.
 
 You can also run the tool against a local audio or video file:
 

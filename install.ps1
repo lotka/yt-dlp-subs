@@ -7,8 +7,12 @@ if (-not (Get-Command py -ErrorAction SilentlyContinue)) {
     Error "py not found. Install Python 3.10 or newer from https://python.org and try again."
 }
 
-$version = py -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')"
-$major, $minor = $version.Split('.') | ForEach-Object { [int]$_ }
+$version = & py -3 -c "import sys; print(str(sys.version_info.major) + '.' + str(sys.version_info.minor))"
+$version = $version.Trim()
+
+$parts = $version.Split(".")
+$major = [int]$parts[0]
+$minor = [int]$parts[1]
 
 if ($major -lt 3 -or ($major -eq 3 -and $minor -lt 10)) {
     Error "Python 3.10+ is required (found $version). Install a newer Python and try again."
@@ -28,12 +32,10 @@ if (-not (Get-Command pipx -ErrorAction SilentlyContinue)) {
         winget install --id pypa.pipx -e
     } elseif (Get-Command scoop -ErrorAction SilentlyContinue) {
         scoop install pipx
-    } elseif (Get-Command choco -ErrorAction SilentlyContinue) {
-        choco install pipx -y
     } else {
         py -m pip install --user pipx
     }
-    pipx ensurepath
+    py -m pipx ensurepath
     $env:PATH += ";$env:USERPROFILE\.local\bin"
 }
 
@@ -41,11 +43,18 @@ if (-not (Get-Command pipx -ErrorAction SilentlyContinue)) {
 Write-Host "Installing yt-dlp-subs..."
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $pythonPath = (Get-Command py).Source
-$installed = pipx list 2>$null | Select-String "yt-dlp-subs"
+try {
+    $pipxList = py -m pipx list 2>$null | Out-String
+} catch {
+    $pipxList = ""
+}
+
+$installed = $pipxList -match "yt-dlp-subs"
+
 if ($installed) {
-    pipx reinstall yt-dlp-subs --python $pythonPath
+    py -m pipx reinstall yt-dlp-subs --python $pythonPath
 } else {
-    pipx install $scriptDir --python $pythonPath
+    py -m pipx install $scriptDir --python $pythonPath
 }
 
 Write-Host ""

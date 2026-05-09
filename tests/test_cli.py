@@ -1,3 +1,4 @@
+import subprocess
 import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -96,7 +97,7 @@ def test_same_path_handles_missing_right_path(tmp_path):
     assert _same_path(tmp_path / "sample.mkv", None) is False
 
 
-def test_main_does_not_overwrite_local_video_when_default_output_matches_source(tmp_path, monkeypatch):
+def test_main_embeds_subtitles_when_default_output_matches_source(tmp_path, monkeypatch):
     source = tmp_path / "sample.mkv"
     source.write_bytes(b"original video")
     temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-test-")
@@ -123,13 +124,14 @@ def test_main_does_not_overwrite_local_video_when_default_output_matches_source(
         "yt_dlp_subs.cli.transcribe_audio",
         lambda *args, **kwargs: [SubtitleSegment(0, 1, "hello")],
     )
+    monkeypatch.setattr("yt_dlp_subs.cli.subprocess.run", _fake_embed_subtitles_run(b"embedded video"))
 
     assert main([str(source), "--groq-api-key", "gsk_test", "--quiet"]) == 0
-    assert source.read_bytes() == b"original video"
+    assert source.read_bytes() == b"embedded video"
     assert (tmp_path / "sample.srt").exists()
 
 
-def test_main_copies_local_video_when_output_does_not_match_source(tmp_path, monkeypatch):
+def test_main_embeds_subtitles_when_output_does_not_match_source(tmp_path, monkeypatch):
     source = tmp_path / "sample.mkv"
     output = tmp_path / "transcript.srt"
     source.write_bytes(b"original video")
@@ -156,10 +158,44 @@ def test_main_copies_local_video_when_output_does_not_match_source(tmp_path, mon
         "yt_dlp_subs.cli.transcribe_audio",
         lambda *args, **kwargs: [SubtitleSegment(0, 1, "hello")],
     )
+    monkeypatch.setattr("yt_dlp_subs.cli.subprocess.run", _fake_embed_subtitles_run(b"embedded video"))
 
     assert main([str(source), "--keep-video", "--output", str(output), "--groq-api-key", "gsk_test", "--quiet"]) == 0
     assert source.read_bytes() == b"original video"
-    assert (tmp_path / "transcript.mkv").read_bytes() == b"temporary video copy"
+    assert (tmp_path / "transcript.mkv").read_bytes() == b"embedded video"
+
+
+def test_main_embeds_mp4_subtitles_as_mov_text(tmp_path, monkeypatch):
+    source = tmp_path / "sample.mp4"
+    output = tmp_path / "transcript.srt"
+    source.write_bytes(b"original video")
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-test-")
+    temp_path = Path(temp_dir.name)
+    audio_path = temp_path / "audio.mp3"
+    video_path = temp_path / "sample.mp4"
+    audio_path.write_bytes(b"audio")
+    video_path.write_bytes(b"temporary video copy")
+    commands = []
+
+    def fake_download_audio(source_arg, **kwargs):
+        return DownloadedAudio(
+            temp_dir,
+            audio_path,
+            "sample",
+            video_path=video_path,
+            source_path=source,
+        )
+
+    monkeypatch.setattr("yt_dlp_subs.cli.download_audio", fake_download_audio)
+    monkeypatch.setattr(
+        "yt_dlp_subs.cli.transcribe_audio",
+        lambda *args, **kwargs: [SubtitleSegment(0, 1, "hello")],
+    )
+    monkeypatch.setattr("yt_dlp_subs.cli.subprocess.run", _fake_embed_subtitles_run(b"embedded video", commands))
+
+    assert main([str(source), "--keep-video", "--output", str(output), "--groq-api-key", "gsk_test", "--quiet"]) == 0
+    assert (tmp_path / "transcript.mp4").read_bytes() == b"embedded video"
+    assert commands[0][commands[0].index("-c:s") + 1] == "mov_text"
 
 
 def test_main_with_all_options(tmp_path, monkeypatch):
@@ -188,6 +224,7 @@ def test_main_with_all_options(tmp_path, monkeypatch):
     monkeypatch.setattr("yt_dlp_subs.cli.download_audio", fake_download_audio)
     monkeypatch.setattr("yt_dlp_subs.cli.transcribe_audio", fake_transcribe_audio)
     monkeypatch.setattr("yt_dlp_subs.cli._open_in_explorer", lambda path: open_calls.append(path))
+    monkeypatch.setattr("yt_dlp_subs.cli.subprocess.run", _fake_embed_subtitles_run(b"embedded video"))
 
     result = main([
         str(source),
@@ -213,7 +250,7 @@ def test_main_with_all_options(tmp_path, monkeypatch):
     assert transcribe_kwargs["temperature"] == pytest.approx(0.2)
     assert output.exists()
     assert (tmp_path / "subtitles.wav").exists()
-    assert (tmp_path / "subtitles.mkv").exists()
+    assert (tmp_path / "subtitles.mkv").read_bytes() == b"embedded video"
     assert len(open_calls) == 1
 
 
@@ -240,3 +277,13 @@ def test_main_passes_no_keep_video_to_downloader(tmp_path, monkeypatch):
     assert main([str(source), "--no-keep-video", "--groq-api-key", "gsk_test", "--quiet"]) == 0
     assert source.read_bytes() == b"original video"
     assert (tmp_path / "sample.srt").exists()
+
+
+def _fake_embed_subtitles_run(video_bytes, commands=None):
+    def fake_run(command, **kwargs):
+        if commands is not None:
+            commands.append(command)
+        Path(command[-1]).write_bytes(video_bytes)
+        return subprocess.CompletedProcess(command, 0)
+
+    return fake_run

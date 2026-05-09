@@ -5,6 +5,7 @@ import os
 import platform
 import re
 import subprocess
+import tempfile
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -167,11 +168,13 @@ def main(argv: list[str] | None = None) -> int:
             if args.keep_video:
                 if downloaded.video_path is not None:
                     video_copy = output_path.with_suffix(downloaded.video_path.suffix)
-                    if _same_path(video_copy, downloaded.source_path):
-                        _status(f"Keeping original video: {video_copy}", quiet=args.quiet)
-                    else:
-                        video_copy.write_bytes(downloaded.video_path.read_bytes())
-                        _status(f"Saved video: {video_copy}", quiet=args.quiet)
+                    _embed_subtitles_in_video(
+                        downloaded.video_path,
+                        output_path,
+                        video_copy,
+                        quiet=args.quiet,
+                    )
+                    _status(f"Saved video with subtitles: {video_copy}", quiet=args.quiet)
                 elif downloaded.source_path is None:
                     _err.print("[yellow]warning:[/yellow] --keep-video was set but no video file was found.")
 
@@ -204,6 +207,74 @@ def _same_path(left: Path, right: Path | None) -> bool:
         return left.resolve() == right.resolve()
     except OSError:
         return False
+
+
+def _embed_subtitles_in_video(video_path: Path, subtitles_path: Path, output_path: Path, *, quiet: bool) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_output = _temporary_video_output(output_path)
+    command = [
+        "ffmpeg",
+        "-y",
+        "-i",
+        str(video_path),
+        "-i",
+        str(subtitles_path),
+        "-map",
+        "0",
+        "-map",
+        "1",
+        "-c",
+        "copy",
+        "-c:s",
+        _subtitle_codec_for_video(output_path),
+        str(tmp_output),
+    ]
+    if quiet:
+        command.insert(1, "-nostats")
+        command.insert(2, "-loglevel")
+        command.insert(3, "error")
+
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError as exc:
+        _cleanup_temporary_video(tmp_output, output_path)
+        raise RuntimeError("ffmpeg was not found on PATH") from exc
+    except subprocess.CalledProcessError as exc:
+        _cleanup_temporary_video(tmp_output, output_path)
+        detail = exc.stderr.decode(errors="replace").strip()
+        message = f"ffmpeg could not embed subtitles in {output_path}"
+        if detail:
+            message = f"{message}: {detail}"
+        raise RuntimeError(message) from exc
+
+    if not tmp_output.exists():
+        raise RuntimeError("ffmpeg completed but no subtitled video file was produced")
+
+    tmp_output.replace(output_path)
+
+
+def _cleanup_temporary_video(tmp_output: Path, output_path: Path) -> None:
+    try:
+        tmp_output.unlink(missing_ok=True)
+    except OSError:
+        pass
+
+
+def _subtitle_codec_for_video(video_path: Path) -> str:
+    if video_path.suffix.lower() in {".m4v", ".mov", ".mp4"}:
+        return "mov_text"
+    return "copy"
+
+
+def _temporary_video_output(output_path: Path) -> Path:
+    handle = tempfile.NamedTemporaryFile(
+        prefix=f".{output_path.stem}.",
+        suffix=output_path.suffix,
+        dir=output_path.parent,
+        delete=False,
+    )
+    handle.close()
+    return Path(handle.name)
 
 
 def _open_in_explorer(path: Path) -> None:

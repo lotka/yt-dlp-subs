@@ -261,8 +261,11 @@ def _cleanup_temporary_video(tmp_output: Path, output_path: Path) -> None:
 
 
 def _subtitle_codec_for_video(video_path: Path) -> str:
-    if video_path.suffix.lower() in {".m4v", ".mov", ".mp4"}:
+    suffix = video_path.suffix.lower()
+    if suffix in {".m4v", ".mov", ".mp4"}:
         return "mov_text"
+    if suffix == ".webm":
+        return "webvtt"
     return "copy"
 
 

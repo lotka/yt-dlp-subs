@@ -198,6 +198,39 @@ def test_main_embeds_mp4_subtitles_as_mov_text(tmp_path, monkeypatch):
     assert commands[0][commands[0].index("-c:s") + 1] == "mov_text"
 
 
+def test_main_embeds_webm_subtitles_as_webvtt(tmp_path, monkeypatch):
+    source = tmp_path / "sample.webm"
+    output = tmp_path / "transcript.srt"
+    source.write_bytes(b"original video")
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-test-")
+    temp_path = Path(temp_dir.name)
+    audio_path = temp_path / "audio.mp3"
+    video_path = temp_path / "sample.webm"
+    audio_path.write_bytes(b"audio")
+    video_path.write_bytes(b"temporary video copy")
+    commands = []
+
+    def fake_download_audio(source_arg, **kwargs):
+        return DownloadedAudio(
+            temp_dir,
+            audio_path,
+            "sample",
+            video_path=video_path,
+            source_path=source,
+        )
+
+    monkeypatch.setattr("yt_dlp_subs.cli.download_audio", fake_download_audio)
+    monkeypatch.setattr(
+        "yt_dlp_subs.cli.transcribe_audio",
+        lambda *args, **kwargs: [SubtitleSegment(0, 1, "hello")],
+    )
+    monkeypatch.setattr("yt_dlp_subs.cli.subprocess.run", _fake_embed_subtitles_run(b"embedded video", commands))
+
+    assert main([str(source), "--keep-video", "--output", str(output), "--groq-api-key", "gsk_test", "--quiet"]) == 0
+    assert (tmp_path / "transcript.webm").read_bytes() == b"embedded video"
+    assert commands[0][commands[0].index("-c:s") + 1] == "webvtt"
+
+
 def test_main_with_all_options(tmp_path, monkeypatch):
     source = tmp_path / "sample.mkv"
     source.write_bytes(b"original video")

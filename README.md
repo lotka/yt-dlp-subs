@@ -201,4 +201,10 @@ Pass `--open` to reveal the output folder in Finder (macOS), Explorer (Windows),
 
 By default, the full downloaded or local video is saved next to the subtitle file with the generated subtitles embedded. Pass `--no-keep-video` to skip saving a video copy and process audio only. Pass `--keep-audio` to also save the extracted audio file.
 
+Before uploading audio to Groq, the tool creates a temporary transcription copy
+as 16 kHz mono MP3 at 48 kbps. This keeps speech quality appropriate for
+Whisper while reducing upload size. If that temporary file is still too large
+for Groq's direct upload limit, it is split into overlapping chunks, transcribed
+chunk by chunk, and merged back into one subtitle timeline.
+
 The default model is `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy is more important than speed. The default temperature is `0.0` (fully deterministic); increase it slightly (e.g. `0.2`) if the transcription feels too repetitive.

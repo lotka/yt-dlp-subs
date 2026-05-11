@@ -70,6 +70,24 @@ def test_audio_format(parse):
     assert parse("--audio-format", "wav").audio_format == "wav"
 
 
+def test_video_format_default(parse):
+    assert parse().video_format is None
+
+
+def test_video_format_mp4(parse):
+    assert parse("--video-format", "mp4").video_format == "mp4"
+
+
+def test_video_format_all_choices(parse):
+    for fmt in ("mp4", "mkv", "mov", "avi", "webm"):
+        assert parse("--video-format", fmt).video_format == fmt
+
+
+def test_video_format_invalid_choice(parse):
+    with pytest.raises(SystemExit):
+        parse("--video-format", "gif")
+
+
 def test_output(parse):
     assert parse("--output", "out.srt").output == Path("out.srt")
 
@@ -285,6 +303,30 @@ def test_main_with_all_options(tmp_path, monkeypatch):
     assert (tmp_path / "subtitles.wav").exists()
     assert (tmp_path / "subtitles.mkv").read_bytes() == b"embedded video"
     assert len(open_calls) == 1
+
+
+def test_main_passes_video_format_to_downloader(tmp_path, monkeypatch):
+    source = tmp_path / "sample.mkv"
+    source.write_bytes(b"original video")
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-test-")
+    temp_path = Path(temp_dir.name)
+    audio_path = temp_path / "audio.mp3"
+    video_path = temp_path / "sample.mkv"
+    audio_path.write_bytes(b"audio")
+    video_path.write_bytes(b"video copy")
+    download_kwargs = {}
+
+    def fake_download_audio(source_arg, **kwargs):
+        download_kwargs.update(kwargs)
+        return DownloadedAudio(temp_dir, audio_path, "sample", video_path=video_path, source_path=source)
+
+    monkeypatch.setattr("yt_dlp_subs.cli.download_audio", fake_download_audio)
+    monkeypatch.setattr("yt_dlp_subs.cli.transcribe_audio", lambda *a, **kw: [SubtitleSegment(0, 1, "hi")])
+    monkeypatch.setattr("yt_dlp_subs.cli.subprocess.run", _fake_embed_subtitles_run(b"embedded video"))
+    monkeypatch.chdir(tmp_path)
+
+    assert main([str(source), "--video-format", "mp4", "--groq-api-key", "gsk_test", "--quiet"]) == 0
+    assert download_kwargs["video_format"] == "mp4"
 
 
 def test_main_passes_no_keep_video_to_downloader(tmp_path, monkeypatch):

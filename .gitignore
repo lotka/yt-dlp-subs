@@ -5,10 +5,40 @@ __pycache__/
 *.egg-info/
 dist/
 build/
-*.srt
 **/.DS_Store
-tests/assets/*
+
+# Audio formats
+*.aac
+*.aiff
+*.alac
+*.flac
+*.m4a
+*.mp3
+*.ogg
+*.opus
+*.wav
+*.wma
+
+# Video formats
+*.avi
+*.flv
+*.m4v
 *.mkv
-*.webm
+*.mov
 *.mp4
+*.mpg
+*.mpeg
+*.ogv
+*.ts
+*.webm
+*.wmv
+
+# Subtitle formats
+*.ass
 *.srt
+*.ssa
+*.vtt
+
+# Keep sample test assets
+tests/assets/*
+!tests/assets/sample.mp3

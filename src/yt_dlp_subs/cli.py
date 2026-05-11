@@ -70,6 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="Save the full downloaded or local video next to the subtitle file. Enabled by default; use --no-keep-video for audio-only processing.",
     )
     parser.add_argument(
+        "--video-format",
+        choices=["mp4", "mkv", "mov", "avi", "webm"],
+        help="Convert the output video to this format (default: keep original).",
+    )
+
+    parser.add_argument(
         "--quiet",
         action="store_true",
         help="Suppress all progress output (yt-dlp and tool status messages).",
@@ -130,12 +136,15 @@ def main(argv: list[str] | None = None) -> int:
             _status("Keeping audio file", quiet=args.quiet)
         if args.keep_video:
             _status("Keeping video file", quiet=args.quiet)
+        if args.video_format:
+            _status(f"Converting video to {args.video_format}...", quiet=args.quiet)
         _status(f"Preparing audio from {args.source}...", quiet=args.quiet)
         with download_audio(
             args.source,
             audio_format=args.audio_format,
             quiet=args.quiet,
             keep_video=args.keep_video,
+            video_format=args.video_format,
         ) as downloaded:
             output_path = _resolve_output_path(args.output, downloaded.title)
 
@@ -177,6 +186,7 @@ def main(argv: list[str] | None = None) -> int:
                     _status(f"Saved video with subtitles: {video_copy}", quiet=args.quiet)
                 elif downloaded.source_path is None:
                     _err.print("[yellow]warning:[/yellow] --keep-video was set but no video file was found.")
+
 
             _console.print(f"[green]✓[/green] Saved subtitles: {output_path}")
 
@@ -258,6 +268,7 @@ def _cleanup_temporary_video(tmp_output: Path, output_path: Path) -> None:
         tmp_output.unlink(missing_ok=True)
     except OSError:
         pass
+
 
 
 def _subtitle_codec_for_video(video_path: Path) -> str:

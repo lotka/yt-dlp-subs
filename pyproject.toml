@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "yt-dlp-subs"
 version = "0.1.0"
-description = "Download online video audio and generate subtitles with Groq Whisper transcription."
+description = "Generate subtitles for online videos and local media files using Groq Whisper transcription."
 readme = "README.md"
 requires-python = ">=3.10"
 dependencies = [

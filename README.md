@@ -4,8 +4,7 @@ Command line subtitle generation for online videos and local media files. It use
 
 ## Install
 
-Requires Python 3.10 or newer and `ffmpeg` on your `PATH`. `yt-dlp` uses
-`ffmpeg` to extract audio before the file is sent to Groq for transcription.
+Requires Python 3.10 or newer and `ffmpeg` on your `PATH`. `ffmpeg` is used to extract audio from both downloaded and local files before transcription.
 
 On macOS:
 
@@ -73,92 +72,17 @@ py -m venv .venv
 python -m pip install -e ".[dev]"
 ```
 
-## Testing
-
-First install the dev dependencies (includes `pytest`):
-
-```bash
-source .venv/bin/activate
-pip install -e ".[dev]"
-```
-
-### Unit tests
-
-Run the full test suite (covers CLI flags, SRT formatting, and transcription parsing):
-
-```bash
-pytest tests/
-```
-
-### End-to-end test
-
-Test with a local video file (all options):
-
-```bash
-yt-dlp-subs sample.mkv \
-  --groq-api-key "$GROQ_API_KEY" \
-  --output subtitles.srt \
-  --model whisper-large-v3 \
-  --language en \
-  --prompt "Me at the zoo" \
-  --temperature 0.2 \
-  --audio-format mp3 \
-  --keep-audio \
-  --keep-video \
-  --open
-```
-
-Test with a YouTube URL (all options):
-
-```bash
-yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw" \
-  --groq-api-key "$GROQ_API_KEY" \
-  --output subtitles.srt \
-  --model whisper-large-v3 \
-  --language en \
-  --prompt "Me at the zoo" \
-  --temperature 0.2 \
-  --audio-format mp3 \
-  --keep-audio \
-  --keep-video \
-  --open
-```
-
-Both should produce a `subtitles.srt` file alongside the audio and a video with the subtitles embedded in the current directory.
-
-You can also run the tool against a local audio or video file:
-
-```bash
-yt-dlp-subs ./video.mp4
-```
-
-## Contributing
-
-1. Fork the repository and create a branch for your change.
-2. Set up the dev environment:
-   ```bash
-   python3 -m venv .venv
-   source .venv/bin/activate
-   pip install -e ".[dev]"
-   ```
-3. Make your changes — the project follows a four-stage pipeline: `cli.py` → `downloader.py` → `transcription.py` → `srt.py`.
-4. Add or update tests in `tests/` and make sure the full suite passes:
-   ```bash
-   pytest tests/
-   ```
-5. Open a pull request with a clear description of what changed and why.
-
 ## Usage
 
 ```bash
 yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw" --groq-api-key="$GROQ_API_KEY"
 ```
 
-Local audio and video files work the same way:
+Local video and audio files work the same way:
 
 ```bash
-yt-dlp-subs ./video.mp4 --groq-api-key="$GROQ_API_KEY"
-yt-dlp-subs ./audio.wav --output transcript.srt
+yt-dlp-subs ./sample.mkv --groq-api-key="$GROQ_API_KEY"
+yt-dlp-subs ./sample.mp3 --output transcript.srt
 ```
 
 You can also set the API key once via an environment variable:
@@ -192,13 +116,89 @@ yt-dlp-subs SOURCE \
   --language en \
   --prompt "Technical talk with Python package names" \
   --temperature 0.2 \
+  --audio-format mp3 \
+  --video-format mp4 \
   --keep-audio \
   --no-keep-video \
   --open
 ```
 
-Pass `--open` to reveal the output folder in Finder (macOS), Explorer (Windows), or the default file manager (Linux) once the subtitle file is saved.
-
 By default, the full downloaded or local video is saved next to the subtitle file with the generated subtitles embedded. Pass `--no-keep-video` to skip saving a video copy and process audio only. Pass `--keep-audio` to also save the extracted audio file.
 
+Pass `--video-format` to convert the output video to a specific format (`mp4`, `mkv`, `mov`, `avi`, `webm`). Useful when YouTube delivers WebM but you need MP4.
+
+Pass `--open` to reveal the output folder in Finder (macOS), Explorer (Windows), or the default file manager (Linux) once the subtitle file is saved.
+
 The default model is `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy is more important than speed. The default temperature is `0.0` (fully deterministic); increase it slightly (e.g. `0.2`) if the transcription feels too repetitive.
+
+## Testing
+
+First install the dev dependencies (includes `pytest`):
+
+```bash
+source .venv/bin/activate
+pip install -e ".[dev]"
+```
+
+### Unit tests
+
+Run the full test suite (covers CLI flags, SRT formatting, and transcription parsing):
+
+```bash
+pytest tests/
+```
+
+### End-to-end test
+
+Test with a local video file (all options):
+
+```bash
+yt-dlp-subs sample.mkv \
+  --groq-api-key "$GROQ_API_KEY" \
+  --output subtitles.srt \
+  --model whisper-large-v3 \
+  --language en \
+  --prompt "Me at the zoo" \
+  --temperature 0.2 \
+  --audio-format mp3 \
+  --video-format mp4 \
+  --keep-audio \
+  --keep-video \
+  --open
+```
+
+Test with a YouTube URL (all options):
+
+```bash
+yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw" \
+  --groq-api-key "$GROQ_API_KEY" \
+  --output subtitles.srt \
+  --model whisper-large-v3 \
+  --language en \
+  --prompt "Me at the zoo" \
+  --temperature 0.2 \
+  --audio-format mp3 \
+  --video-format mp4 \
+  --keep-audio \
+  --keep-video \
+  --open
+```
+
+Both should produce a `subtitles.srt` file alongside the audio and a video with the subtitles embedded in the current directory.
+
+## Contributing
+
+1. Fork the repository and create a branch for your change.
+2. Set up the dev environment:
+   ```bash
+   python3 -m venv .venv
+   source .venv/bin/activate
+   pip install -e ".[dev]"
+   ```
+3. Make your changes — the project follows a four-stage pipeline: `cli.py` → `downloader.py` → `transcription.py` → `srt.py`.
+4. Add or update tests in `tests/` and make sure the full suite passes:
+   ```bash
+   pytest tests/
+   ```
+5. Don't push any audio or video files.
+6. Open a pull request with a clear description of what changed and why.

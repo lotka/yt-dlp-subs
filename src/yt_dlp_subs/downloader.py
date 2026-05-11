@@ -46,6 +46,7 @@ def download_audio(
     audio_format: str = "mp3",
     quiet: bool = False,
     keep_video: bool = False,
+    video_format: str | None = None,
 ) -> DownloadedAudio:
     local_path = _local_path_from_source(source)
     if local_path is not None:
@@ -54,12 +55,14 @@ def download_audio(
             audio_format=audio_format,
             quiet=quiet,
             keep_video=keep_video,
+            video_format=video_format,
         )
     return _download_audio_from_url(
         source,
         audio_format=audio_format,
         quiet=quiet,
         keep_video=keep_video,
+        video_format=video_format,
     )
 
 
@@ -69,12 +72,14 @@ def _download_audio_from_url(
     audio_format: str,
     quiet: bool,
     keep_video: bool,
+    video_format: str | None = None,
 ) -> DownloadedAudio:
     if keep_video:
         return _download_video_from_url(
             url,
             audio_format=audio_format,
             quiet=quiet,
+            video_format=video_format,
         )
 
     temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-")
@@ -116,6 +121,7 @@ def _download_video_from_url(
     *,
     audio_format: str,
     quiet: bool,
+    video_format: str | None = None,
 ) -> DownloadedAudio:
     temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-")
     temp_path = Path(temp_dir.name)
@@ -144,6 +150,8 @@ def _download_video_from_url(
     audio_path = temp_path / f"audio.{audio_format}"
     try:
         _extract_audio_to_path(video_path, audio_path, quiet=quiet)
+        if video_format and video_path.suffix.lower().lstrip(".") != video_format:
+            video_path = _convert_video(video_path, video_format, quiet=quiet)
     except DownloadFailure:
         temp_dir.cleanup()
         raise
@@ -163,6 +171,7 @@ def _extract_local_audio(
     audio_format: str,
     quiet: bool,
     keep_video: bool,
+    video_format: str | None = None,
 ) -> DownloadedAudio:
     if path.suffix.lower().lstrip(".") not in _ALLOWED_EXTENSIONS:
         raise DownloadFailure(
@@ -184,6 +193,12 @@ def _extract_local_audio(
     if keep_video and not _looks_like_audio_file(path):
         video_path = temp_path / path.name
         shutil.copy2(path, video_path)
+        if video_format and video_path.suffix.lower().lstrip(".") != video_format:
+            try:
+                video_path = _convert_video(video_path, video_format, quiet=quiet)
+            except DownloadFailure:
+                temp_dir.cleanup()
+                raise
 
     return DownloadedAudio(
         temp_dir,
@@ -192,6 +207,24 @@ def _extract_local_audio(
         video_path=video_path,
         source_path=path,
     )
+
+
+def _convert_video(source_path: Path, target_format: str, *, quiet: bool) -> Path:
+    output_path = source_path.with_suffix(f".{target_format}")
+    command = ["ffmpeg", "-y", "-i", str(source_path)]
+    if target_format == "mp4":
+        command += ["-c:v", "libx264", "-c:a", "aac"]
+    command.append(str(output_path))
+    if quiet:
+        command[1:1] = ["-nostats", "-loglevel", "error"]
+    try:
+        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    except FileNotFoundError as exc:
+        raise DownloadFailure("ffmpeg was not found on PATH") from exc
+    except subprocess.CalledProcessError as exc:
+        detail = exc.stderr.decode(errors="replace").strip()
+        raise DownloadFailure(f"ffmpeg could not convert video to {target_format}: {detail}") from exc
+    return output_path
 
 
 def _extract_audio_to_path(source_path: Path, audio_path: Path, *, quiet: bool) -> None:

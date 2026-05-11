@@ -190,14 +190,17 @@ def _extract_local_audio(
 
     video_path = None
     if keep_video and not _looks_like_audio_file(path):
-        video_path = temp_path / path.name
-        shutil.copy2(path, video_path)
-        if video_format and video_path.suffix.lower().lstrip(".") != video_format:
+        needs_conversion = video_format and path.suffix.lower().lstrip(".") != video_format
+        if needs_conversion:
+            video_in_temp = temp_path / path.name
+            shutil.copy2(path, video_in_temp)
             try:
-                video_path = _convert_video(video_path, video_format, quiet=quiet)
+                video_path = _convert_video(video_in_temp, video_format, quiet=quiet)
             except DownloadFailure:
                 temp_dir.cleanup()
                 raise
+        else:
+            video_path = path
 
     return DownloadedAudio(
         temp_dir,

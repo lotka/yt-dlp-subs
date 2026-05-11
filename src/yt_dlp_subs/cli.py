@@ -177,13 +177,18 @@ def main(argv: list[str] | None = None) -> int:
             if args.keep_video:
                 if downloaded.video_path is not None:
                     video_copy = output_path.with_suffix(downloaded.video_path.suffix)
-                    _embed_subtitles_in_video(
-                        downloaded.video_path,
-                        output_path,
-                        video_copy,
-                        quiet=args.quiet,
-                    )
-                    _status(f"Saved video with subtitles: {video_copy}", quiet=args.quiet)
+                    try:
+                        _embed_subtitles_in_video(
+                            downloaded.video_path,
+                            output_path,
+                            video_copy,
+                            quiet=args.quiet,
+                        )
+                    except RuntimeError as exc:
+                        _err.print(f"[yellow]warning:[/yellow] {_strip_ansi(str(exc))}")
+                        _err.print("[yellow]warning:[/yellow] subtitles were saved, but video embedding failed.")
+                    else:
+                        _status(f"Saved video with subtitles: {video_copy}", quiet=args.quiet)
                 elif downloaded.source_path is None:
                     _err.print("[yellow]warning:[/yellow] --keep-video was set but no video file was found.")
 
@@ -222,45 +227,87 @@ def _same_path(left: Path, right: Path | None) -> bool:
 def _embed_subtitles_in_video(video_path: Path, subtitles_path: Path, output_path: Path, *, quiet: bool) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
     tmp_output = _temporary_video_output(output_path)
+    commands = [
+        _subtitle_embed_command(
+            video_path,
+            subtitles_path,
+            tmp_output,
+            reencode_audio=False,
+        ),
+        _subtitle_embed_command(
+            video_path,
+            subtitles_path,
+            tmp_output,
+            reencode_audio=True,
+        ),
+    ]
+
+    last_error = ""
+    for index, command in enumerate(commands):
+        try:
+            subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        except FileNotFoundError as exc:
+            _cleanup_temporary_video(tmp_output, output_path)
+            raise RuntimeError("ffmpeg was not found on PATH") from exc
+        except subprocess.CalledProcessError as exc:
+            _cleanup_temporary_video(tmp_output, output_path)
+            detail = exc.stderr.decode(errors="replace").strip()
+            last_error = detail or str(exc)
+            if index < len(commands) - 1:
+                continue
+
+            message = f"ffmpeg could not embed subtitles in {output_path}"
+            if last_error:
+                message = f"{message}: {last_error}"
+            raise RuntimeError(message) from exc
+
+        if not tmp_output.exists():
+            _cleanup_temporary_video(tmp_output, output_path)
+            last_error = "ffmpeg completed but did not produce a subtitled video file"
+            if index < len(commands) - 1:
+                continue
+            raise RuntimeError(last_error)
+
+        tmp_output.replace(output_path)
+        return
+
+
+def _subtitle_embed_command(
+    video_path: Path,
+    subtitles_path: Path,
+    output_path: Path,
+    *,
+    reencode_audio: bool,
+) -> list[str]:
     command = [
         "ffmpeg",
         "-y",
+        "-nostdin",
+        "-hide_banner",
+        "-nostats",
+        "-loglevel",
+        "error",
         "-i",
         str(video_path),
         "-i",
         str(subtitles_path),
         "-map",
-        "0",
+        "0:v?",
         "-map",
-        "1",
+        "0:a?",
+        "-map",
+        "0:s?",
+        "-map",
+        "1:0",
         "-c",
         "copy",
         "-c:s",
         _subtitle_codec_for_video(output_path),
-        str(tmp_output),
     ]
-    if quiet:
-        command.insert(1, "-nostats")
-        command.insert(2, "-loglevel")
-        command.insert(3, "error")
-
-    try:
-        subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    except FileNotFoundError as exc:
-        _cleanup_temporary_video(tmp_output, output_path)
-        raise RuntimeError("ffmpeg was not found on PATH") from exc
-    except subprocess.CalledProcessError as exc:
-        _cleanup_temporary_video(tmp_output, output_path)
-        detail = exc.stderr.decode(errors="replace").strip()
-        message = f"ffmpeg could not embed subtitles in {output_path}"
-        if detail:
-            message = f"{message}: {detail}"
-        raise RuntimeError(message) from exc
-
-    if not tmp_output.exists():
-        raise RuntimeError("ffmpeg completed but no subtitled video file was produced")
-
-    tmp_output.replace(output_path)
+    if reencode_audio:
+        command.extend(["-c:a", _fallback_audio_codec_for_video(output_path)])
+    command.append(str(output_path))
+    return command
 
 
 def _cleanup_temporary_video(tmp_output: Path, output_path: Path) -> None:
@@ -278,6 +325,12 @@ def _subtitle_codec_for_video(video_path: Path) -> str:
     if suffix == ".webm":
         return "webvtt"
     return "copy"
+
+
+def _fallback_audio_codec_for_video(video_path: Path) -> str:
+    if video_path.suffix.lower() == ".webm":
+        return "libopus"
+    return "aac"
 
 
 def _temporary_video_output(output_path: Path) -> Path:

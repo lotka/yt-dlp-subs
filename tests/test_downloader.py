@@ -6,6 +6,9 @@ import pytest
 from yt_dlp_subs.downloader import DownloadFailure, download_audio
 
 
+FFMPEG_QUIET_FLAGS = ["-nostdin", "-hide_banner", "-nostats", "-loglevel", "error"]
+
+
 def test_download_audio_keep_video_preserves_merged_url_video(monkeypatch):
     ydl_options = []
 
@@ -69,7 +72,7 @@ def test_download_audio_uses_ffmpeg_for_local_file(tmp_path, monkeypatch):
 
     assert commands == [
         (
-            ["ffmpeg", "-y", "-i", str(source), "-vn", commands[0][0][-1]],
+            ["ffmpeg", "-y", *FFMPEG_QUIET_FLAGS, "-i", str(source), "-vn", commands[0][0][-1]],
             {"check": True, "stdout": subprocess.PIPE, "stderr": subprocess.PIPE},
         )
     ]
@@ -89,6 +92,7 @@ def test_download_audio_keeps_local_video_copy(tmp_path, monkeypatch):
         assert downloaded.video_path is not None
         assert downloaded.video_path.name == "clip.mp4"
         assert downloaded.video_path.read_bytes() == b"video"
+        assert downloaded.video_path == source
 
 
 def test_download_audio_does_not_treat_local_audio_as_video(tmp_path, monkeypatch):

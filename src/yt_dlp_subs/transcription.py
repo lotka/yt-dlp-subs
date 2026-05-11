@@ -48,6 +48,11 @@ def prepare_audio_for_groq(source_path: Path, output_path: Path) -> None:
     command = [
         "ffmpeg",
         "-y",
+        "-nostdin",
+        "-hide_banner",
+        "-nostats",
+        "-loglevel",
+        "error",
         "-i",
         str(source_path),
         "-vn",
@@ -146,6 +151,11 @@ def _write_audio_chunk(
     command = [
         "ffmpeg",
         "-y",
+        "-nostdin",
+        "-hide_banner",
+        "-nostats",
+        "-loglevel",
+        "error",
         "-ss",
         f"{start:.3f}",
         "-t",

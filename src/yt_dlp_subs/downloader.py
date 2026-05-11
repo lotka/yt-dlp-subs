@@ -151,6 +151,12 @@ def _download_video_from_url(
     return DownloadedAudio(temp_dir, audio_path, title, video_path=video_path)
 
 
+_ALLOWED_EXTENSIONS = {
+    "aac", "aiff", "alac", "flac", "m4a", "mp3", "ogg", "opus", "wav", "wma",
+    "avi", "flv", "m4v", "mkv", "mov", "mp4", "mpg", "mpeg", "ogv", "ts", "webm", "wmv",
+}
+
+
 def _extract_local_audio(
     path: Path,
     *,
@@ -158,6 +164,12 @@ def _extract_local_audio(
     quiet: bool,
     keep_video: bool,
 ) -> DownloadedAudio:
+    if path.suffix.lower().lstrip(".") not in _ALLOWED_EXTENSIONS:
+        raise DownloadFailure(
+            f"{path.name} is not a supported video or audio file. "
+            f"Supported formats: {', '.join(sorted(_ALLOWED_EXTENSIONS))}."
+        )
+
     temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-")
     temp_path = Path(temp_dir.name)
     audio_path = temp_path / f"audio.{audio_format}"

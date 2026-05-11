@@ -3,7 +3,14 @@ import pytest
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from yt_dlp_subs.cli import build_parser, main, _resolve_output_path, _same_path
+from yt_dlp_subs.cli import (
+    build_parser,
+    main,
+    _embed_subtitles_in_video,
+    _resolve_output_path,
+    _same_path,
+    _subtitle_embed_command,
+)
 from yt_dlp_subs.downloader import DownloadedAudio
 from yt_dlp_subs.srt import SubtitleSegment
 
@@ -196,6 +203,7 @@ def test_main_embeds_mp4_subtitles_as_mov_text(tmp_path, monkeypatch):
     assert main([str(source), "--keep-video", "--output", str(output), "--groq-api-key", "gsk_test", "--quiet"]) == 0
     assert (tmp_path / "transcript.mp4").read_bytes() == b"embedded video"
     assert commands[0][commands[0].index("-c:s") + 1] == "mov_text"
+    assert commands[0][commands[0].index("-map") + 1] == "0:v?"
 
 
 def test_main_embeds_webm_subtitles_as_webvtt(tmp_path, monkeypatch):
@@ -310,6 +318,84 @@ def test_main_passes_no_keep_video_to_downloader(tmp_path, monkeypatch):
     assert main([str(source), "--no-keep-video", "--groq-api-key", "gsk_test", "--quiet"]) == 0
     assert source.read_bytes() == b"original video"
     assert (tmp_path / "sample.srt").exists()
+
+
+def test_main_keeps_subtitles_when_video_embedding_fails(tmp_path, monkeypatch, capsys):
+    source = tmp_path / "sample.mp4"
+    source.write_bytes(b"original video")
+    temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-test-")
+    temp_path = Path(temp_dir.name)
+    audio_path = temp_path / "audio.mp3"
+    audio_path.write_bytes(b"audio")
+
+    def fake_download_audio(source_arg, **kwargs):
+        return DownloadedAudio(
+            temp_dir,
+            audio_path,
+            "sample",
+            video_path=source,
+            source_path=source,
+        )
+
+    def fake_run(command, **kwargs):
+        raise subprocess.CalledProcessError(
+            1,
+            command,
+            stderr=b"Error parsing ADTS frame header!",
+        )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr("yt_dlp_subs.cli.download_audio", fake_download_audio)
+    monkeypatch.setattr(
+        "yt_dlp_subs.cli.transcribe_audio",
+        lambda *args, **kwargs: [SubtitleSegment(0, 1, "hello")],
+    )
+    monkeypatch.setattr("yt_dlp_subs.cli.subprocess.run", fake_run)
+
+    assert main([str(source), "--groq-api-key", "gsk_test", "--quiet"]) == 0
+    assert (tmp_path / "sample.srt").exists()
+    assert source.read_bytes() == b"original video"
+    assert "video embedding failed" in capsys.readouterr().err
+
+
+def test_embed_subtitles_retries_with_audio_reencode(tmp_path, monkeypatch):
+    source = tmp_path / "sample.mp4"
+    subtitles = tmp_path / "sample.srt"
+    output = tmp_path / "output.mp4"
+    source.write_bytes(b"video")
+    subtitles.write_text("1\n00:00:00,000 --> 00:00:01,000\nhello\n", encoding="utf-8")
+    commands = []
+
+    def fake_run(command, **kwargs):
+        commands.append(command)
+        if len(commands) == 1:
+            raise subprocess.CalledProcessError(
+                1,
+                command,
+                stderr=b"Error parsing ADTS frame header!",
+            )
+        Path(command[-1]).write_bytes(b"embedded")
+        return subprocess.CompletedProcess(command, 0)
+
+    monkeypatch.setattr("yt_dlp_subs.cli.subprocess.run", fake_run)
+
+    _embed_subtitles_in_video(source, subtitles, output, quiet=True)
+
+    assert output.read_bytes() == b"embedded"
+    assert "-c:a" not in commands[0]
+    assert commands[1][commands[1].index("-c:a") + 1] == "aac"
+
+
+def test_subtitle_embed_command_maps_media_streams_only(tmp_path):
+    command = _subtitle_embed_command(
+        tmp_path / "sample.mp4",
+        tmp_path / "sample.srt",
+        tmp_path / "output.mp4",
+        reencode_audio=False,
+    )
+
+    maps = [command[index + 1] for index, value in enumerate(command) if value == "-map"]
+    assert maps == ["0:v?", "0:a?", "0:s?", "1:0"]
 
 
 def _fake_embed_subtitles_run(video_bytes, commands=None):

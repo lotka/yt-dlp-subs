@@ -10,6 +10,9 @@ from yt_dlp_subs.transcription import (
 )
 
 
+FFMPEG_QUIET_FLAGS = ["-nostdin", "-hide_banner", "-nostats", "-loglevel", "error"]
+
+
 def test_prepare_audio_for_groq_downsamples_to_mono_mp3(tmp_path, monkeypatch) -> None:
     source = tmp_path / "source.wav"
     output = tmp_path / "groq.mp3"
@@ -30,6 +33,7 @@ def test_prepare_audio_for_groq_downsamples_to_mono_mp3(tmp_path, monkeypatch) -
     assert command == [
         "ffmpeg",
         "-y",
+        *FFMPEG_QUIET_FLAGS,
         "-i",
         str(source),
         "-vn",

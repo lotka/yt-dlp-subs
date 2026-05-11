@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 import subprocess
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -161,7 +160,6 @@ def _extract_local_audio(
     temp_dir = TemporaryDirectory(prefix="yt-dlp-subs-")
     temp_path = Path(temp_dir.name)
     audio_path = temp_path / f"audio.{audio_format}"
-
     try:
         _extract_audio_to_path(path, audio_path, quiet=quiet)
     except DownloadFailure:
@@ -170,8 +168,7 @@ def _extract_local_audio(
 
     video_path = None
     if keep_video and not _looks_like_audio_file(path):
-        video_path = temp_path / path.name
-        shutil.copy2(path, video_path)
+        video_path = path
 
     return DownloadedAudio(
         temp_dir,
@@ -186,15 +183,16 @@ def _extract_audio_to_path(source_path: Path, audio_path: Path, *, quiet: bool) 
     command = [
         "ffmpeg",
         "-y",
+        "-nostdin",
+        "-hide_banner",
+        "-nostats",
+        "-loglevel",
+        "error",
         "-i",
         str(source_path),
         "-vn",
         str(audio_path),
     ]
-    if quiet:
-        command.insert(1, "-nostats")
-        command.insert(2, "-loglevel")
-        command.insert(3, "error")
 
     try:
         subprocess.run(command, check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)

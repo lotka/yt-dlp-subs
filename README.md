@@ -124,7 +124,7 @@ yt-dlp-subs "https://www.youtube.com/watch?v=jNQXAC9IVRw" \
   --open
 ```
 
-Both should produce a `subtitles.srt` file alongside the audio and video in the current directory.
+Both should produce a `subtitles.srt` file alongside the audio and a video with the subtitles embedded in the current directory.
 
 You can also run the tool against a local audio or video file:
 
@@ -199,6 +199,6 @@ yt-dlp-subs SOURCE \
 
 Pass `--open` to reveal the output folder in Finder (macOS), Explorer (Windows), or the default file manager (Linux) once the subtitle file is saved.
 
-By default, the full downloaded or local video is saved next to the subtitle file while audio is extracted for transcription. Pass `--no-keep-video` to skip saving a video copy and process audio only. Pass `--keep-audio` to also save the extracted audio file.
+By default, the full downloaded or local video is saved next to the subtitle file with the generated subtitles embedded. Pass `--no-keep-video` to skip saving a video copy and process audio only. Pass `--keep-audio` to also save the extracted audio file.
 
 The default model is `whisper-large-v3-turbo`. Use `whisper-large-v3` when accuracy is more important than speed. The default temperature is `0.0` (fully deterministic); increase it slightly (e.g. `0.2`) if the transcription feels too repetitive.

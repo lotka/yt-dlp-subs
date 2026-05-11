@@ -8,5 +8,7 @@ build/
 *.srt
 **/.DS_Store
 tests/assets/*
-!tests/assets/sample.mkv
-!tests/assets/sample.srt
+*.mkv
+*.webm
+*.mp4
+*.srt

@@ -41,4 +41,3 @@ build/
 
 # Keep sample test assets
 tests/assets/*
-!tests/assets/sample.mp3
